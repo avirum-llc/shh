@@ -61,3 +61,77 @@ Moved the grill-phase artifacts (`spec.md`, `research.md`, `plan.md`) out
 of `.claude/grill-runs/shh/` and into `docs/`. They were project-first-class
 docs hiding inside a tool-specific hidden folder; now they live where a
 contributor would actually look. README and `.gitignore` updated.
+
+---
+
+## 2026-04-19 (later) — Phase 1A: Vault + `shh keys`
+
+Scope: build `ShhCore.Vault` + `KeychainStore` + `shh keys add/list/remove`
+as pure SPM work, no Xcode project yet.
+
+### What went in
+
+- `Sources/ShhCore/Vault/VaultKey.swift` — model. `Provider` is a
+  `RawRepresentable` struct (accepts any string; named constants for
+  Tier-1 LLM providers). `Bucket` enum (personal / work). `slugified`
+  string extension.
+- `Sources/ShhCore/Vault/KeychainError.swift` — typed errors with
+  `LocalizedError` descriptions that surface the OS's own message when
+  the status code is unhandled.
+- `Sources/ShhCore/Vault/KeychainStore.swift` — `Security.framework`
+  wrapper. `kSecAttrAccessControl` with `.biometryCurrentSet` +
+  `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`. Reads use `LAContext`
+  with `touchIDAuthenticationAllowableReuseDuration = 300` so a session
+  only prompts on the first read inside a 5-minute window.
+- `Sources/ShhCore/Vault/Vault.swift` — `actor` facade. Keychain holds
+  secrets; JSON metadata at `~/.config/shh/vault-metadata.json` holds
+  non-secret fields (provider, label, fingerprint, bucket, timestamps).
+- `Sources/shh/Commands/Keys.swift` — `shh keys list`, `shh keys add`
+  (interactive `getpass` by default, `--stdin` for scripting and agents),
+  `shh keys remove`. Every read has `--json`.
+- `Sources/shh/ShhCommand.swift` — renamed from `main.swift` (file named
+  `main.swift` triggers top-level-code mode which conflicts with `@main`).
+
+### Dev signing
+
+Keychain access from an SPM-built CLI needs the binary signed with a
+Keychain entitlement. Added:
+
+- `shh-cli.entitlements` — `keychain-access-groups` with a templated
+  `$(AppIdentifierPrefix)` prefix that gets substituted at sign time. Keeps
+  the source file team-agnostic.
+- `scripts/codesign-dev.sh` — discovers the first Apple Development
+  identity via `security find-identity`, extracts the team id, substitutes
+  it into a temp entitlements file, and signs the dev binary. Run after
+  every `swift build`.
+
+### What worked
+
+- `swift build` clean
+- `swift test` — 10 / 10 pass (7 `VaultKey` + 2 `KeychainStore`
+  construction + 1 legacy `Shh.version` check)
+- CLI smoke: `shh --help`, `shh keys --help`, `shh status`,
+  `shh status --json`, `shh keys list` on an empty vault
+
+### What didn't work yet
+
+End-to-end Keychain write from the signed CLI — the process is SIGKILL'd
+(exit 137) with no output. Likely root cause: **Apple Development certs
+need a provisioning profile to activate Keychain entitlements at runtime,
+and CLI binaries don't carry one.** Further poking from the command line
+wasn't productive without either dropping biometric access control, using
+an ad-hoc signing layout, or generating a real .app bundle.
+
+### Decision
+
+Defer real Keychain validation to Phase 1B, where the Xcode project
+(MenuBarExtra shell) gets created and the app target carries a real
+provisioning profile. The CLI binary gets bundled inside the .app in a
+later phase; it then inherits the app's signing context and Keychain
+access becomes trivial.
+
+### What's next (Phase 1B)
+
+Create `Shh.xcodeproj` with a MenuBarExtra app target depending on the
+local Swift Package. Wire the SwiftUI Add Key sheet and menubar dropdown
+to `ShhCore.Vault`. First real Touch ID moment lives here.

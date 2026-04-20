@@ -57,6 +57,13 @@ struct ShhApp: App {
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+
+        Window("Welcome to shh", id: WindowID.firstRun) {
+            FirstRunWindow()
+                .onAppear { NSApp.activate(ignoringOtherApps: true) }
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 
     @Sendable
@@ -70,6 +77,7 @@ enum WindowID {
     static let addKey = "shh.window.addKey"
     static let dashboard = "shh.window.dashboard"
     static let connect = "shh.window.connect"
+    static let firstRun = "shh.window.firstRun"
 }
 
 private struct MenuBarContent: View {
@@ -79,6 +87,7 @@ private struct MenuBarContent: View {
     let onQuit: () -> Void
 
     @Environment(\.openWindow) private var openWindow
+    @AppStorage("shh.firstRunCompleted") private var firstRunCompleted = false
 
     var body: some View {
         MenuBarDropdown(
@@ -92,6 +101,11 @@ private struct MenuBarContent: View {
             onRefresh: onRefresh,
             onQuit: onQuit
         )
+        .task {
+            if !firstRunCompleted {
+                open(WindowID.firstRun)
+            }
+        }
     }
 
     private func open(_ id: String) {

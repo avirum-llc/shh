@@ -15,10 +15,13 @@ if ! command -v xcodegen >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "[1/3] Generating Shh.xcodeproj from project.yml..."
+echo "[1/4] Generating Shh.xcodeproj from project.yml..."
 xcodegen generate --quiet
 
-echo "[2/3] Building Shh.app..."
+echo "[2/4] Building shh CLI (swift build)..."
+swift build --configuration debug 2>&1 | tail -3
+
+echo "[3/4] Building Shh.app (xcodebuild — also bundles the CLI)..."
 xcodebuild \
     -project Shh.xcodeproj \
     -scheme Shh \
@@ -31,7 +34,16 @@ xcodebuild \
 
 APP_PATH="$(xcodebuild -project Shh.xcodeproj -scheme Shh -configuration Debug -showBuildSettings 2>/dev/null | awk '/ BUILT_PRODUCTS_DIR / {print $3}')/Shh.app"
 
-echo "[3/3] Built at: $APP_PATH"
+echo "[4/4] Built at: $APP_PATH"
+if [ -f "$APP_PATH/Contents/Helpers/shh" ]; then
+    echo "CLI bundled: $APP_PATH/Contents/Helpers/shh"
+fi
 echo
 echo "Run it:"
 echo "  open '$APP_PATH'"
+echo
+echo "Use the bundled CLI (shares Keychain with the app):"
+echo "  '$APP_PATH/Contents/Helpers/shh' --help"
+echo
+echo "Symlink if you want \`shh\` on PATH:"
+echo "  ln -sf '$APP_PATH/Contents/Helpers/shh' /usr/local/bin/shh"

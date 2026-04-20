@@ -40,3 +40,29 @@ targets:
     dependencies:
       - package: ShhCore
         product: ShhCore
+    postBuildScripts:
+      - name: Bundle shh CLI binary
+        script: |
+          set -e
+          cd "$SRCROOT"
+          CONFIG_LOWER=$(echo "$CONFIGURATION" | tr '[:upper:]' '[:lower:]')
+          # Build the CLI via SPM if it hasn't been built yet.
+          if [ ! -f ".build/$CONFIG_LOWER/shh" ]; then
+              swift build --configuration "$CONFIG_LOWER"
+          fi
+          CLI_SRC="$SRCROOT/.build/$CONFIG_LOWER/shh"
+          # Use Contents/Helpers/shh — not Contents/MacOS/shh.
+          # macOS filesystems are case-insensitive by default, so 'shh'
+          # collides with 'Shh' (the app's main executable) and corrupts
+          # the bundle on case-insensitive volumes.
+          CLI_DIR="$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app/Contents/Helpers"
+          CLI_DST="$CLI_DIR/shh"
+          if [ -f "$CLI_SRC" ]; then
+              mkdir -p "$CLI_DIR"
+              cp "$CLI_SRC" "$CLI_DST"
+              # Re-sign the bundle: we've added a file after the Xcode
+              # codesign phase. --deep covers the nested CLI.
+              codesign --force --sign - --deep "$BUILT_PRODUCTS_DIR/$PRODUCT_NAME.app"
+              echo "Bundled CLI: $CLI_DST"
+          fi
+        runOnlyWhenInstalling: false

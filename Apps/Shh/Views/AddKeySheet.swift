@@ -1,9 +1,9 @@
 import SwiftUI
 import ShhCore
 
-/// Sheet presented from the menubar dropdown to add a new API key.
-/// Mirrors the `shh keys add` CLI but through a native form. Matches
-/// `shh-plan.md` §4 "Add key sheet" design.
+/// Opened as a standalone Window scene (see `ShhApp`). Mirrors the
+/// `shh keys add` CLI flow through a native form. Matches `shh-plan.md`
+/// §4 "Add key sheet" design.
 struct AddKeySheet: View {
     let vault: Vault
     let onDismiss: () -> Void
@@ -11,6 +11,7 @@ struct AddKeySheet: View {
     @State private var providerText: String = "anthropic"
     @State private var label: String = "personal"
     @State private var secret: String = ""
+    @State private var secretVisible: Bool = false
     @State private var bucket: VaultKey.Bucket = .personal
     @State private var errorMessage: String?
     @State private var isSaving = false
@@ -52,7 +53,7 @@ struct AddKeySheet: View {
             }
         }
         .padding(22)
-        .frame(width: 360)
+        .frame(width: 400)
     }
 
     private var providerField: some View {
@@ -86,8 +87,26 @@ struct AddKeySheet: View {
     private var secretField: some View {
         VStack(alignment: .leading, spacing: 5) {
             fieldLabel("API key")
-            SecureField("sk-…", text: $secret)
+            HStack(spacing: 6) {
+                Group {
+                    if secretVisible {
+                        TextField("sk-…", text: $secret)
+                    } else {
+                        SecureField("sk-…", text: $secret)
+                    }
+                }
                 .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12, design: .monospaced))
+
+                Button(action: { secretVisible.toggle() }) {
+                    Image(systemName: secretVisible ? "eye.slash" : "eye")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(secretVisible ? "Hide key" : "Show key")
+            }
             Text("Clipboard will be cleared on save.")
                 .font(Tokens.fontLabel)
                 .foregroundStyle(.tertiary)

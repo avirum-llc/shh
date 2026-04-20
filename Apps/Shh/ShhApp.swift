@@ -4,15 +4,32 @@ import ShhCore
 @main
 struct ShhApp: App {
     @State private var keys: [VaultKey] = []
+    @State private var supervisor: ProxySupervisor
+
     private static let vault = Vault()
+
+    init() {
+        let sup = ProxySupervisor(vault: Self.vault)
+        _supervisor = State(wrappedValue: sup)
+        // Kick off proxy start on the main actor. Runs on the next main
+        // queue tick — the supervisor is already initialised by then.
+        Task { @MainActor in
+            await sup.start()
+        }
+    }
 
     var body: some Scene {
         MenuBarExtra {
             MenuBarContent(
                 keys: keys,
+                supervisor: supervisor,
                 onRefresh: refresh,
                 onQuit: { NSApplication.shared.terminate(nil) }
             )
+            .task {
+                await supervisor.start()
+                await refresh()
+            }
         } label: {
             MenuBarLabel()
         }
@@ -26,26 +43,38 @@ struct ShhApp: App {
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+
+        Window("Spend", id: WindowID.dashboard) {
+            DashboardWindow()
+                .onAppear { NSApp.activate(ignoringOtherApps: true) }
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
+        Window("Connect a tool", id: WindowID.connect) {
+            ConnectWindow()
+                .onAppear { NSApp.activate(ignoringOtherApps: true) }
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 
     @Sendable
     private func refresh() async {
         keys = (try? await Self.vault.list()) ?? []
+        await supervisor.refreshSpend()
     }
 }
 
-/// Identifiers for programmatically-opened windows.
 enum WindowID {
     static let addKey = "shh.window.addKey"
+    static let dashboard = "shh.window.dashboard"
+    static let connect = "shh.window.connect"
 }
 
-/// Menubar dropdown body. Lives inside a View so we can pull
-/// `@Environment(\.openWindow)` — which is how a sheet-like flow is
-/// presented without fighting MenuBarExtra's focus behaviour. Opening a
-/// proper Window scene survives the dropdown closing and takes its own
-/// keyboard focus.
 private struct MenuBarContent: View {
     let keys: [VaultKey]
+    let supervisor: ProxySupervisor
     let onRefresh: @Sendable () async -> Void
     let onQuit: () -> Void
 
@@ -54,26 +83,26 @@ private struct MenuBarContent: View {
     var body: some View {
         MenuBarDropdown(
             keys: keys,
-            onAddKey: openAddKey,
+            proxyState: supervisor.state,
+            todayCost: supervisor.todayCostEstimated,
+            requestCount: supervisor.requestCountToday,
+            onAddKey: { open(WindowID.addKey) },
+            onOpenDashboard: { open(WindowID.dashboard) },
+            onOpenConnect: { open(WindowID.connect) },
             onRefresh: onRefresh,
             onQuit: onQuit
         )
-        .task { await onRefresh() }
     }
 
-    private func openAddKey() {
+    private func open(_ id: String) {
         NSApp.activate(ignoringOtherApps: true)
-        openWindow(id: WindowID.addKey)
+        openWindow(id: id)
     }
 }
 
-/// Thin wrapper that gives the Add Key form a real Window lifecycle plus
-/// an `onAppear` activation so the window comes to front even though this
-/// is an `LSUIElement` accessory app.
 private struct AddKeyWindowRoot: View {
     let vault: Vault
     let onSaved: () -> Void
-
     @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
@@ -84,8 +113,6 @@ private struct AddKeyWindowRoot: View {
                 dismissWindow(id: WindowID.addKey)
             }
         )
-        .onAppear {
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        .onAppear { NSApp.activate(ignoringOtherApps: true) }
     }
 }

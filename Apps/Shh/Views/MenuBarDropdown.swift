@@ -3,7 +3,12 @@ import ShhCore
 
 struct MenuBarDropdown: View {
     let keys: [VaultKey]
+    let proxyState: ProxySupervisor.State
+    let todayCost: Double
+    let requestCount: Int
     let onAddKey: () -> Void
+    let onOpenDashboard: () -> Void
+    let onOpenConnect: () -> Void
     let onRefresh: @Sendable () async -> Void
     let onQuit: () -> Void
 
@@ -12,16 +17,20 @@ struct MenuBarDropdown: View {
             header
                 .padding(.horizontal, 14)
                 .padding(.top, 12)
-                .padding(.bottom, 12)
+                .padding(.bottom, 10)
 
             Divider()
 
-            Group {
-                if keys.isEmpty {
-                    emptyState
-                } else {
-                    keyList
-                }
+            hero
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+
+            Divider()
+
+            if keys.isEmpty {
+                emptyState
+            } else {
+                keyList
             }
 
             Divider()
@@ -32,15 +41,17 @@ struct MenuBarDropdown: View {
         .frame(width: 300)
     }
 
-    // MARK: - Header
-
     private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("shh")
-                .font(.system(size: 13, weight: .semibold))
-            Text(subtitle)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("shh")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            statusPill
         }
     }
 
@@ -48,13 +59,49 @@ struct MenuBarDropdown: View {
         keys.isEmpty ? "No keys yet" : "\(keys.count) key\(keys.count == 1 ? "" : "s") in vault"
     }
 
-    // MARK: - Empty state
+    private var statusPill: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 6, height: 6)
+            Text(statusText)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var statusText: String {
+        switch proxyState {
+        case .stopped:  return "proxy off"
+        case .starting: return "starting"
+        case .running:  return "proxy on"
+        case .failed:   return "proxy failed"
+        }
+    }
+
+    private var statusColor: Color {
+        switch proxyState {
+        case .stopped, .starting: return Color.secondary
+        case .running:            return Color.green
+        case .failed:             return Color.red
+        }
+    }
+
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(String(format: "$%.2f", todayCost))
+                .font(.system(size: 28, weight: .ultraLight).monospacedDigit())
+            Text("today · \(requestCount) request\(requestCount == 1 ? "" : "s") · estimated")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+        }
+    }
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Your API keys, safely stored.")
                 .font(.system(size: 12))
-            Text("Add one here, or run `shh keys add` in a terminal.")
+            Text("Add one here, or run `shh scan` to migrate keys you already have.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -63,8 +110,6 @@ struct MenuBarDropdown: View {
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-
-    // MARK: - Key list
 
     private var keyList: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -106,11 +151,11 @@ struct MenuBarDropdown: View {
             }
     }
 
-    // MARK: - Actions
-
     private var actions: some View {
         VStack(alignment: .leading, spacing: 0) {
+            actionRow("Dashboard", shortcut: "⌘D", primary: false, action: onOpenDashboard)
             actionRow("Add key", shortcut: "⌘N", primary: true, action: onAddKey)
+            actionRow("Connect a tool…", shortcut: "⌘T", primary: false, action: onOpenConnect)
             actionRow("Quit shh", shortcut: "⌘Q", primary: false, action: onQuit)
         }
     }

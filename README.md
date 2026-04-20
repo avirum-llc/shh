@@ -29,10 +29,32 @@ runs `printenv`, it sees the dummy token — useless outside the proxy. See
 
 ## Development
 
+### CLI and library (pure SPM)
+
 ```sh
 swift build
 swift test
 ```
+
+Dev-signing the CLI so it can touch Keychain:
+
+```sh
+./scripts/codesign-dev.sh
+```
+
+### Menubar app (Xcode, generated from `project.yml`)
+
+The `Shh.xcodeproj` is not committed — it's generated from `project.yml`
+via [xcodegen](https://github.com/yonaskolb/XcodeGen) so contributors see
+one diffable source of truth instead of a 2000-line `project.pbxproj`.
+
+```sh
+brew install xcodegen       # one-time
+xcodegen generate            # any time project.yml changes
+open Shh.xcodeproj
+```
+
+### Architecture
 
 The `shh` CLI is the primary interface. The SwiftUI menubar app is a thin
 consumer of the same `ShhCore` library — every GUI action is callable from

@@ -1,0 +1,42 @@
+name: Shh
+
+options:
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+packages:
+  ShhCore:
+    path: .
+
+targets:
+  Shh:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - Apps/Shh
+    info:
+      path: Apps/Shh/Info.plist
+      properties:
+        LSUIElement: true
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        NSFaceIDUsageDescription: "shh uses Touch ID / Face ID to protect your API keys when reading them from the vault."
+        NSHumanReadableCopyright: "Copyright © 2026 Manish Singh. MIT License."
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.avirumapps.shh
+        DEVELOPMENT_TEAM: "422FSC44SS"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: Apps/Shh/Shh.entitlements
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        MARKETING_VERSION: "0.0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.10"
+    dependencies:
+      - package: ShhCore
+        product: ShhCore

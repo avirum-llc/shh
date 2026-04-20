@@ -3,11 +3,12 @@
 .swiftpm/
 Package.resolved
 
-# Xcode (for when .xcodeproj lands in Phase 1)
-*.xcodeproj/project.xcworkspace/xcuserdata/
-*.xcodeproj/xcuserdata/
-*.xcworkspace/xcuserdata/
+# Xcode — the whole project is generated from project.yml by xcodegen
+*.xcodeproj/
+*.xcworkspace/
 DerivedData/
+# xcodegen-generated Info.plist
+Apps/Shh/Info.plist
 
 # macOS
 .DS_Store

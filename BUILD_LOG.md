@@ -135,3 +135,59 @@ access becomes trivial.
 Create `Shh.xcodeproj` with a MenuBarExtra app target depending on the
 local Swift Package. Wire the SwiftUI Add Key sheet and menubar dropdown
 to `ShhCore.Vault`. First real Touch ID moment lives here.
+
+---
+
+## 2026-04-19 (even later) — Phase 1B: menubar app scaffold
+
+Chose **xcodegen** over committing the `.xcodeproj` directly. project.yml
+is a ~35-line diffable spec; the `.xcodeproj` is a 2000-line XML file
+that merges badly. One-time `brew install xcodegen` is a cheap ask for
+anyone who wants to build the app.
+
+### What went in
+
+- `project.yml` — xcodegen spec for the `Shh` macOS app target. macOS
+  14+, `LSUIElement: true` (menubar-only, hidden from Dock), sandbox
+  disabled (the app needs to write to `~/.config/shh/` alongside the
+  CLI; the proxy will run sandboxed in a separate XPC service later).
+  Hardened runtime on. Team id: `422FSC44SS` (Manish's Apple Development
+  team, same as Roast).
+- `Apps/Shh/Shh.entitlements` — `keychain-access-groups` with the
+  templated `$(AppIdentifierPrefix)` prefix, same pattern as the CLI's
+  entitlements.
+- `Apps/Shh/ShhApp.swift` — `@main` app with `MenuBarExtra(.window)`,
+  refreshing the key list on appear and after each Add Key sheet dismiss.
+  One shared `Vault` actor for the app lifetime.
+- `Apps/Shh/Views/MenuBarLabel.swift` — lock-icon + key-count label, the
+  permanent menubar presence.
+- `Apps/Shh/Views/MenuBarDropdown.swift` — 320px dropdown with header,
+  empty-state hint, per-key rows, and Add-key / Quit actions with
+  keyboard shortcuts. Functional scaffold; full design-system polish
+  from PRD §4 lands when real content exists to style.
+- `Apps/Shh/Views/AddKeySheet.swift` — form with Provider picker
+  (Anthropic / OpenAI / Gemini + Custom…), Label, API key (SecureField),
+  Bucket segment. Clipboard clears on save. Error message surfaces any
+  Keychain failure. Calls through to `Vault.add`.
+- `Apps/Shh/Theme/Tokens.swift` — colors, typography, layout constants
+  from `shh-plan.md` §4 in a single enum. Single source of truth for
+  future views.
+
+### What's verified
+
+- All source files written; exhaustive fields from project.yml provided.
+- Not built yet — requires `xcodegen generate` + `open Shh.xcodeproj`
+  which is a local interactive step.
+
+### What's next
+
+Manish runs `brew install xcodegen && xcodegen generate`, opens
+`Shh.xcodeproj`, builds. On first launch: menubar lock + "0" appears,
+dropdown shows empty state, Add Key sheet opens. First add should
+trigger a Touch ID prompt and land a key in Keychain — the first real
+product moment.
+
+If the build reveals SwiftUI or project.yml issues, iterate. Once the
+Add Key flow is happy, Phase 1C bundles the CLI binary inside the .app
+and symlinks it to `/usr/local/bin/shh` so the CLI inherits the app's
+signing identity. That closes the Keychain-from-CLI loop.

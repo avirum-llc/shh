@@ -11,6 +11,7 @@ struct ShhCommand: AsyncParsableCommand {
         subcommands: [
             Status.self,
             Keys.self,
+            Scan.self,
         ],
         defaultSubcommand: Status.self
     )

@@ -291,7 +291,7 @@ the menubar app (which the app's Keychain namespace can see) and run
 `claude "hi"` through the proxy. The proxy path is known to work;
 the untested surface is just the final byte-for-byte API exchange.
 
-### What's still open for v0.1
+### What's still open for v0.1 (at end of that push)
 
 1. **Phase 1C** — bundle the `shh` CLI inside `Shh.app/Contents/MacOS`,
    symlink to `/usr/local/bin/shh`. Makes the CLI inherit the app's
@@ -303,3 +303,82 @@ the untested surface is just the final byte-for-byte API exchange.
 4. **First-run threat-model flow** (three-screen explainer).
 5. **Sparkle + GitHub Releases CI + Homebrew cask** (Phase 8 release
    pipeline).
+
+---
+
+## 2026-04-19 (very end) — v0.1 backbone complete
+
+Knocked every remaining item except the ones that need real user
+credentials (Apple Developer cert in CI, Sparkle EdDSA keys, an actual
+Anthropic round-trip). Commits 38536de → 3518edb.
+
+### What landed
+
+- **Phase 5 (complete):** Codex, Aider, OpenCode connectors.
+  Codex + Aider use the shell-rc env-block pattern. OpenCode merges a
+  provider block into `~/.config/opencode/opencode.json` and only
+  removes loopback entries on disconnect.
+- **Proxy streaming:** `URLSession.bytes(for:)` + HTTP/1.1 chunked
+  transfer encoding. Claude Code SSE flows byte-for-byte now. 4 KB
+  buffered chunks. Mid-stream errors truncate the client's body.
+- **Phase 1C — CLI bundled in .app:** xcodegen postBuildScripts runs
+  `swift build`, copies the CLI to `Shh.app/Contents/Helpers/shh`
+  (not `Contents/MacOS/shh` — case-insensitive FS collision with the
+  main `Shh` binary), re-signs with `--deep`. Shared Keychain
+  verified: keys added via the GUI are visible to the bundled CLI.
+- **First-run onboarding:** three-screen `FirstRunWindow` fired on
+  first dropdown open, persisted via `@AppStorage`.
+- **ScannerWindow:** GUI for `shh scan` — checkboxes, bucket picker,
+  "Migrate selected". Reuses the `Migrator` actor.
+- **CLIInstaller + "Install CLI" menubar action:** tries
+  `/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin` in order,
+  creates `~/.local/bin` lazily, prints result inline. Falls back to
+  showing the manual `ln -sf` command.
+- **`shh run`:** ad-hoc process wrapping. `shh run --provider X
+  --project Y --label Z -- cmd...` spawns a child with the right
+  env vars set.
+- **Phase 8 scaffold:** `.github/workflows/ci.yml` (build/test/smoke
+  on every push), `.github/workflows/release.yml` (tag-triggered,
+  six secrets needed), `homebrew-cask.rb.template` for the sibling
+  tap repo.
+- **`shh status`** rewritten to actually ping the proxy.
+
+### Final state: 17 commits, all tests green, proxy alive
+
+```
+swift build   → clean
+swift test    → 17/17 pass
+shh --version → 0.0.1-dev
+shh status    → proxy running, vault 1 key
+curl /__shh_ping__ → {"shh":"alive"}
+```
+
+### What's still not verified
+
+1. **Real Anthropic round-trip.** Needs a real API key entered through
+   the menubar, then `claude "hi"` through the bundled CLI. Proxy
+   parse → vault lookup → stream forwarding is exercised; upstream
+   handoff is the only line of code that's never seen production
+   bytes.
+2. **Real CI run.** Needs the six GitHub secrets + tag push.
+
+### Deferred past v0.1
+
+- **MCP server** (`shh mcp`) — agent-facing interface; v0.2.
+- **Provider billing reconciliation** — needs org-admin keys most
+  personal users don't have. Numbers stay "estimated" in v0.1.
+- **Real biometric in dev builds** — acceptable dev/release split.
+- **`shh quiet`** — trivial when needed.
+- **Sparkle** — TODO in release.yml; wire when shipping updates.
+
+### Minimum to actually release
+
+1. Test the Anthropic round-trip end-to-end with a real key.
+2. Set up `avirumapps/homebrew-shh` tap repo.
+3. Generate Sparkle EdDSA keys, publish initial appcast.xml, add
+   `SUFeedURL` to Info.plist.
+4. Add the six CI secrets.
+5. `git tag v0.1.0-alpha && git push origin v0.1.0-alpha`.
+
+Scaffold carries all the pieces; remaining work is credentials,
+external repos, and one genuine test.

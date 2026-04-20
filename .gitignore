@@ -1,0 +1,32 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode (for when .xcodeproj lands in Phase 1)
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Claude session data — but keep grill-run artifacts
+.claude/*
+!.claude/grill-runs/
+.memsearch/
+
+# Local Claude memory (per-user notes, not shared)
+memory/
+
+# Release artifacts
+*.dmg
+*.app
+*.pkg
+
+# Local env / secrets
+.env
+.env.*
+*.p12
+*.provisionprofile

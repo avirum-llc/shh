@@ -1,0 +1,60 @@
+<div style="background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+
+  <div style="font-size: 12px; color: var(--color-text-secondary); letter-spacing: 0.05em; text-transform: uppercase;">Menubar icon · 4 states</div>
+
+  <div style="background: rgba(28,28,30,0.96); border-radius: 8px; padding: 0; width: 100%; max-width: 580px; overflow: hidden; border: 0.5px solid rgba(255,255,255,0.08); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;">
+
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); align-items: stretch;">
+
+      <div style="padding: 14px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; border-right: 0.5px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.85); font-family: 'SF Mono', monospace; font-size: 13px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span style="font-feature-settings: 'tnum';">$4.27</span>
+        </div>
+        <div style="font-size: 10px; color: rgba(255,255,255,0.45); text-align: center; line-height: 1.4;">Default<br/>shows today's spend</div>
+      </div>
+
+      <div style="padding: 14px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; border-right: 0.5px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; align-items: center; gap: 4px; color: rgba(29,158,117,0.95); font-family: 'SF Mono', monospace; font-size: 13px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(29,158,117,0.95)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span style="font-feature-settings: 'tnum';">$4.61</span>
+        </div>
+        <div style="font-size: 10px; color: rgba(255,255,255,0.45); text-align: center; line-height: 1.4;">Active<br/>request in flight</div>
+      </div>
+
+      <div style="padding: 14px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; border-right: 0.5px solid rgba(255,255,255,0.08);">
+        <div style="display: flex; align-items: center; gap: 4px; color: rgba(189,143,30,0.95); font-family: 'SF Mono', monospace; font-size: 13px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(189,143,30,0.95)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span style="font-feature-settings: 'tnum';">$22.40</span>
+        </div>
+        <div style="font-size: 10px; color: rgba(255,255,255,0.45); text-align: center; line-height: 1.4;">Approaching cap<br/>≥80% of daily limit</div>
+      </div>
+
+      <div style="padding: 14px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 4px; color: rgba(255,90,90,0.95); font-family: 'SF Mono', monospace; font-size: 13px;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,90,90,0.95)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M16 11V7a5 5 0 0 0-9-3"/>
+            <line x1="3" y1="3" x2="21" y2="21"/>
+          </svg>
+          <span style="color: rgba(255,255,255,0.4); font-size: 11px;">offline</span>
+        </div>
+        <div style="font-size: 10px; color: rgba(255,255,255,0.45); text-align: center; line-height: 1.4;">Proxy down<br/>tools will fail safely</div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div style="font-size: 11px; color: var(--color-text-tertiary); margin-top: 4px; max-width: 580px; text-align: center; line-height: 1.5;">The menubar is the product. White = idle, teal = active request, amber = approaching budget, red-with-broken-lock = proxy down. The number itself is the affordance.</div>
+
+</div>

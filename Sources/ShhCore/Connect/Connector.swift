@@ -32,6 +32,9 @@ public extension Connector {
 public enum Connectors {
     public static let all: [Connector] = [
         ClaudeCodeConnector(),
+        OpenAICodexConnector(),
+        AiderConnector(),
+        OpenCodeConnector(),
         GeminiCLIConnector(),
     ]
 

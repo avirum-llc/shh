@@ -12,6 +12,7 @@ struct ShhCommand: AsyncParsableCommand {
             Status.self,
             Keys.self,
             Scan.self,
+            Connect.self,
             ProxyCommand.self,
             SpendCommand.self,
         ],

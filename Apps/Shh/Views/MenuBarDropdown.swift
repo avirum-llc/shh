@@ -9,8 +9,12 @@ struct MenuBarDropdown: View {
     let onAddKey: () -> Void
     let onOpenDashboard: () -> Void
     let onOpenConnect: () -> Void
+    let onOpenScanner: () -> Void
+    let onInstallCLI: () -> String
     let onRefresh: @Sendable () async -> Void
     let onQuit: () -> Void
+
+    @State private var installCLIMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -155,7 +159,19 @@ struct MenuBarDropdown: View {
         VStack(alignment: .leading, spacing: 0) {
             actionRow("Dashboard", shortcut: "⌘D", primary: false, action: onOpenDashboard)
             actionRow("Add key", shortcut: "⌘N", primary: true, action: onAddKey)
+            actionRow("Scan for leaks…", shortcut: "⌘S", primary: false, action: onOpenScanner)
             actionRow("Connect a tool…", shortcut: "⌘T", primary: false, action: onOpenConnect)
+            actionRow("Install CLI", shortcut: "", primary: false) {
+                installCLIMessage = onInstallCLI()
+            }
+            if let installCLIMessage {
+                Text(installCLIMessage)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 6)
+            }
             actionRow("Quit shh", shortcut: "⌘Q", primary: false, action: onQuit)
         }
     }

@@ -64,6 +64,13 @@ struct ShhApp: App {
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+
+        Window("Scan for keys", id: WindowID.scanner) {
+            ScannerWindow()
+                .onAppear { NSApp.activate(ignoringOtherApps: true) }
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 
     @Sendable
@@ -78,6 +85,7 @@ enum WindowID {
     static let dashboard = "shh.window.dashboard"
     static let connect = "shh.window.connect"
     static let firstRun = "shh.window.firstRun"
+    static let scanner = "shh.window.scanner"
 }
 
 private struct MenuBarContent: View {
@@ -98,6 +106,8 @@ private struct MenuBarContent: View {
             onAddKey: { open(WindowID.addKey) },
             onOpenDashboard: { open(WindowID.dashboard) },
             onOpenConnect: { open(WindowID.connect) },
+            onOpenScanner: { open(WindowID.scanner) },
+            onInstallCLI: installCLI,
             onRefresh: onRefresh,
             onQuit: onQuit
         )
@@ -111,6 +121,23 @@ private struct MenuBarContent: View {
     private func open(_ id: String) {
         NSApp.activate(ignoringOtherApps: true)
         openWindow(id: id)
+    }
+
+    private func installCLI() -> String {
+        do {
+            let result = try CLIInstaller.install()
+            switch result {
+            case .installed(let url):
+                return "CLI installed at \(url.path). Open a new terminal and try `shh --version`."
+            case .alreadyInstalled(let url):
+                return "CLI already linked at \(url.path)."
+            case .needsManualInstall(let source, let suggested):
+                let paths = suggested.map { $0.path }.joined(separator: " | ")
+                return "Couldn't write to \(paths). Run: ln -sf '\(source.path)' /usr/local/bin/shh"
+            }
+        } catch {
+            return error.localizedDescription
+        }
     }
 }
 

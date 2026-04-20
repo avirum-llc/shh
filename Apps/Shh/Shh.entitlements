@@ -4,9 +4,18 @@
 <dict>
     <key>com.apple.security.app-sandbox</key>
     <false/>
-    <key>keychain-access-groups</key>
-    <array>
-        <string>$(AppIdentifierPrefix)com.avirumapps.shh</string>
-    </array>
 </dict>
 </plist>
+<!--
+    Dev entitlements intentionally omit `keychain-access-groups`.
+    Adding an access-group entitlement forces Xcode to require a
+    provisioning profile, which requires an Apple ID logged into
+    Xcode > Settings > Accounts and a matching Developer Program
+    team. That's fine for release (Phase 8 CI re-adds the
+    team-prefixed access group so the .app and the bundled CLI share
+    Keychain cleanly), but it blocks command-line ad-hoc dev builds.
+
+    Unsandboxed macOS apps can read and write generic-password items
+    in the user's login Keychain without a `keychain-access-groups`
+    entitlement — the default access group is the bundle id.
+-->

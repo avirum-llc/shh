@@ -1,0 +1,122 @@
+name: Release
+
+# Triggers on version tags (v0.1.0, v0.1.1-rc1, etc). Builds the macOS
+# app, signs it with the Developer ID cert stored in secrets, notarizes
+# via notarytool, staples, packages as DMG, uploads to GitHub Releases,
+# and bumps the Sparkle appcast.
+#
+# Required secrets (set under repo Settings → Secrets and variables):
+#   SIGNING_CERT_P12           base64-encoded .p12 exported from Keychain
+#   SIGNING_CERT_PASSWORD      password set when exporting
+#   APPLE_ID                   your Apple ID email
+#   APPLE_APP_PASSWORD         app-specific password from appleid.apple.com
+#   APPLE_TEAM_ID              422FSC44SS
+#   SPARKLE_ED_PRIVATE_KEY     EdDSA private key for appcast signing
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Install tooling
+        run: |
+          brew install xcodegen create-dmg
+
+      - name: Import signing certificate
+        env:
+          CERT_P12: ${{ secrets.SIGNING_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN=build.keychain
+          KEYCHAIN_PWD=$(openssl rand -hex 16)
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          security set-keychain-settings -lut 7200 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN"
+          echo "$CERT_P12" | base64 --decode > cert.p12
+          security import cert.p12 -k "$KEYCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN"
+          rm cert.p12
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build shh CLI (release)
+        run: swift build --configuration release
+
+      - name: Build Shh.app (release, Developer ID signed)
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcodebuild \
+            -project Shh.xcodeproj \
+            -scheme Shh \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            build
+
+      - name: Locate built app
+        id: app
+        run: |
+          APP_PATH="$(xcodebuild -project Shh.xcodeproj -scheme Shh -configuration Release -showBuildSettings | awk '/ BUILT_PRODUCTS_DIR / {print $3}')/Shh.app"
+          echo "path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP="${{ steps.app.outputs.path }}"
+          ZIP="/tmp/Shh.zip"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          xcrun notarytool submit "$ZIP" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --wait
+          xcrun stapler staple "$APP"
+
+      - name: Create DMG
+        id: dmg
+        run: |
+          APP="${{ steps.app.outputs.path }}"
+          DMG="/tmp/Shh-${GITHUB_REF_NAME}.dmg"
+          create-dmg \
+            --volname "shh" \
+            --window-pos 200 120 \
+            --window-size 480 300 \
+            --icon-size 100 \
+            --icon "Shh.app" 120 140 \
+            --app-drop-link 360 140 \
+            --no-internet-enable \
+            "$DMG" "$APP"
+          echo "path=$DMG" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(shasum -a 256 "$DMG" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.dmg.outputs.path }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') }}
+
+      # TODO: regenerate appcast.xml (Sparkle) and push to main; open PR
+      # to avirumapps/homebrew-shh with new version + sha256

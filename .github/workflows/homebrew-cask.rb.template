@@ -1,0 +1,39 @@
+# Homebrew cask template for the avirumapps/homebrew-shh tap.
+# Create a sibling repo at github.com/avirumapps/homebrew-shh with the
+# contents of this file at Casks/shh.rb. The release workflow will
+# eventually open a PR to bump version + sha256 automatically.
+
+cask "shh" do
+  version "0.1.0"
+  sha256 "REPLACE_WITH_DMG_SHA256"
+
+  url "https://github.com/avirumapps/shh/releases/download/v#{version}/Shh-v#{version}.dmg"
+  name "shh"
+  desc "Local API key vault + proxy + cost tracker for AI coding tools"
+  homepage "https://shh.avirumapps.com"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  app "Shh.app"
+
+  postflight do
+    # Symlink the bundled CLI if /usr/local/bin is writable.
+    cli = "/Applications/Shh.app/Contents/Helpers/shh"
+    target = "/usr/local/bin/shh"
+    if File.writable?(File.dirname(target))
+      File.symlink(cli, target) unless File.exist?(target)
+    end
+  end
+
+  uninstall quit:    "com.avirumapps.shh",
+            delete:  ["/usr/local/bin/shh"]
+
+  zap trash: [
+    "~/.config/shh",
+    "~/Library/Application Support/shh",
+    "~/Library/Preferences/com.avirumapps.shh.plist",
+  ]
+end

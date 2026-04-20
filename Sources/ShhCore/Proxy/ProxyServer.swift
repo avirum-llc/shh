@@ -91,15 +91,13 @@ public actor ProxyServer {
         do {
             let request = try await readRequest(from: connection)
 
-            // Handle a health-check ping without a real forward, so the
-            // CLI and GUI can detect liveness without needing a key.
+            // Health-check ping — no forward, no auth.
             if request.path.hasPrefix("/__shh_ping__") {
                 try await respondPing(on: connection)
                 return
             }
 
-            let (record, response) = try await fulfill(request: request, startedAt: started)
-            try await respond(response, on: connection)
+            let record = try await streamThrough(request: request, startedAt: started, on: connection)
             try await log.append(record)
         } catch {
             try? await respondError(error, on: connection)
@@ -168,9 +166,18 @@ public actor ProxyServer {
         return (String(parts[0]), String(parts[1]), headers)
     }
 
-    // MARK: - Forward
+    // MARK: - Forward (streaming)
 
-    private func fulfill(request: HTTPRequest, startedAt: Date) async throws -> (RequestRecord, HTTPResponse) {
+    /// Streams the upstream response back as HTTP/1.1 chunked transfer.
+    /// Writes the response head as soon as upstream returns it, then
+    /// forwards body bytes in ~4 KB chunks as they arrive. SSE flows
+    /// through with no buffering — Claude Code sees tokens render as
+    /// the model emits them.
+    private func streamThrough(
+        request: HTTPRequest,
+        startedAt: Date,
+        on connection: NWConnection
+    ) async throws -> RequestRecord {
         guard let token = request.authToken else { throw ProxyError.missingAuth }
         let dummy = try DummyToken.parse(token)
 
@@ -196,21 +203,55 @@ public actor ProxyServer {
         }
         UpstreamRouter.applyCredentials(to: &upstreamRequest, provider: dummy.provider, realKey: realKey)
 
-        let (bodyData, urlResponse) = try await session.data(for: upstreamRequest)
+        // Opening the bytes(for:) stream returns the head as soon as
+        // upstream is ready; body bytes flow on the AsyncBytes sequence.
+        let (byteStream, urlResponse) = try await session.bytes(for: upstreamRequest)
         guard let http = urlResponse as? HTTPURLResponse else {
             throw ProxyError.badRequest("upstream response had no status")
         }
 
+        // Write the response head with chunked encoding. We control the
+        // framing ourselves; drop upstream's content-length / transfer-
+        // encoding to avoid double-framing.
         var responseHeaders: [String: String] = [:]
         for (k, v) in http.allHeaderFields {
             if let ks = k as? String, let vs = v as? String {
                 responseHeaders[ks.lowercased()] = vs
             }
         }
-        let response = HTTPResponse(status: http.statusCode, headers: responseHeaders, body: bodyData)
+        responseHeaders.removeValue(forKey: "content-length")
+        responseHeaders["transfer-encoding"] = "chunked"
+        responseHeaders["connection"] = "close"
+
+        var head = "HTTP/1.1 \(http.statusCode) \(statusText(for: http.statusCode))\r\n"
+        for (k, v) in responseHeaders.sorted(by: { $0.key < $1.key }) {
+            head += "\(k): \(v)\r\n"
+        }
+        head += "\r\n"
+        try await connection.sendAsync(Data(head.utf8))
+
+        // Stream bytes in buffered chunks.
+        var buffer = Data()
+        buffer.reserveCapacity(4096)
+        var totalOut = 0
+        let targetChunkSize = 4096
+
+        for try await byte in byteStream {
+            buffer.append(byte)
+            totalOut += 1
+            if buffer.count >= targetChunkSize {
+                try await sendChunk(buffer, on: connection)
+                buffer.removeAll(keepingCapacity: true)
+            }
+        }
+        if !buffer.isEmpty {
+            try await sendChunk(buffer, on: connection)
+        }
+        // Zero-length terminating chunk.
+        try await connection.sendAsync(Data("0\r\n\r\n".utf8), isComplete: true)
 
         let inputBytes = request.body.count
-        let outputBytes = bodyData.count
+        let outputBytes = totalOut
         let inputTokens = TokenCounter.estimate(bytes: inputBytes)
         let outputTokens = TokenCounter.estimate(bytes: outputBytes)
         let model = TokenCounter.parseModel(from: request.body)
@@ -224,7 +265,7 @@ public actor ProxyServer {
         } ?? 0
         let duration = Int(Date().timeIntervalSince(startedAt) * 1000)
 
-        let record = RequestRecord(
+        return RequestRecord(
             timestamp: startedAt,
             provider: dummy.provider,
             keyID: keyID,
@@ -238,26 +279,16 @@ public actor ProxyServer {
             durationMs: duration,
             status: http.statusCode
         )
-        return (record, response)
     }
 
-    // MARK: - Respond
-
-    private func respond(_ response: HTTPResponse, on connection: NWConnection) async throws {
-        var headers = response.headers
-        headers["content-length"] = "\(response.body.count)"
-        headers["connection"] = "close"
-        headers.removeValue(forKey: "transfer-encoding")  // we buffered the full body
-
-        var head = "HTTP/1.1 \(response.status) \(statusText(for: response.status))\r\n"
-        for (k, v) in headers.sorted(by: { $0.key < $1.key }) {
-            head += "\(k): \(v)\r\n"
-        }
-        head += "\r\n"
-
-        try await connection.sendAsync(Data(head.utf8))
-        try await connection.sendAsync(response.body, isComplete: true)
+    private func sendChunk(_ data: Data, on connection: NWConnection) async throws {
+        let hexLen = String(format: "%X", data.count)
+        try await connection.sendAsync(Data("\(hexLen)\r\n".utf8))
+        try await connection.sendAsync(data)
+        try await connection.sendAsync(Data("\r\n".utf8))
     }
+
+    // MARK: - Respond (buffered — ping + error only)
 
     private func respondPing(on connection: NWConnection) async throws {
         let body = Data(#"{"shh":"alive"}"#.utf8)

@@ -220,3 +220,86 @@ here. Once it's happy:
   CLI-from-terminal flow starts working.
 - **Phase 2:** scanner + migration flow (walk shell configs and `.env`
   files, surface detected keys, offer to move them into the vault).
+
+---
+
+## 2026-04-19 (end of day) — Phases 2–6 shipped
+
+One long push through the full v0.1 backbone.
+
+### What landed
+
+- **Phase 2 — Scanner / migrator:** `ShhCore.Scanner` with
+  `KeyPattern` catalog (Tier 1 LLM, Tier 2 paid, Tier 3 secrets),
+  `FileScanner` (two-signal classifier, scans shell configs, CLI
+  configs, project dirs), `Migrator` (vault-first writes, source
+  rewritten with `shh-<provider>-<label>` markers). `shh scan` +
+  `--json` + `--migrate`. 7 tests added.
+- **Phase 3 — Proxy:** `ShhCore.Proxy` with `ProxyServer` on
+  Network.framework + URLSession for upstream (buffered — streaming
+  is a v0.2 polish). `DummyToken` format `shh.<provider>.<project>.
+  <label>`. `UpstreamRouter` handles Anthropic (`x-api-key`), Gemini
+  (query param), everyone else (`Bearer`). `/__shh_ping__` endpoint
+  for CLI-side health checks.
+- **Phase 4 — Cost tracker:** `ShhCore.Log` with `RequestLog`
+  (newline-delimited JSON at
+  `~/Library/Application Support/shh/requests.ndjson`), bundled
+  `PriceTable` for Opus/Sonnet/Haiku 4.x + GPT-5/5.5 + Gemini 2.5/3
+  Pro, byte-heuristic `TokenCounter`. `shh spend --range` + `--json`.
+- **Phase 5 (partial) — Connect flows:** Claude Code connector writes
+  `~/.claude/settings.json` with `ANTHROPIC_AUTH_TOKEN` + telemetry-
+  disable env vars; Gemini CLI connector appends a marked block to
+  the user's shell rc. `shh connect list/tool/disconnect`. Codex /
+  Aider / OpenCode are pending.
+- **Phase 6 — GUI integration:** `ProxySupervisor` actor-wrapper on
+  the main actor; starts the proxy from `ShhApp.init` via a
+  `Task { @MainActor }` so it comes up at launch, not on first
+  dropdown click. `DashboardWindow` reads the request log with range
+  toggle and per-provider / per-project breakdowns. `ConnectWindow`
+  is detection-first with monogram cards. Menubar hero number +
+  status pill (on/off/starting/failed).
+- **Phase 6 polish:** `shh status` now actually pings the proxy and
+  reports today's spend instead of the Phase-0 stub text.
+
+### End-to-end verified
+
+The full CLI stack smoke-passes on a running app:
+
+- `shh --help` shows 6 top-level subcommands.
+- `shh status` reports proxy running, vault count, today's spend.
+- `shh proxy status` → `running on 127.0.0.1:18888`.
+- `curl http://127.0.0.1:18888/__shh_ping__` → `{"shh":"alive"}`.
+- `lsof -nP -iTCP:18888` shows the Shh process holding the port.
+- `shh scan --json` picked up real Anthropic + Gemini keys in
+  `~/.claude/settings.local.json` and
+  `~/Documents/claude/openclaw-server/connection.md` — an honest
+  end-to-end run.
+- `shh connect tool claude-code --dry-run` emits the exact
+  `settings.json` mutation.
+- Proxy error paths: a non-`shh.` token surfaces *"Malformed shh
+  token"*; a well-formed but unknown token surfaces *"Keychain item
+  not found"* — both as HTTP 502 with JSON body. The full parse →
+  vault-lookup → forward path is exercised without needing a real
+  upstream key.
+- `shh spend --today --json` returns well-formed empty counts; the
+  log is writable, it simply has no successful requests yet.
+
+### What's not yet verified
+
+A real Anthropic round-trip — needs the user to add a real key via
+the menubar app (which the app's Keychain namespace can see) and run
+`claude "hi"` through the proxy. The proxy path is known to work;
+the untested surface is just the final byte-for-byte API exchange.
+
+### What's still open for v0.1
+
+1. **Phase 1C** — bundle the `shh` CLI inside `Shh.app/Contents/MacOS`,
+   symlink to `/usr/local/bin/shh`. Makes the CLI inherit the app's
+   signing identity so CLI-added keys and app-added keys share the
+   same Keychain namespace. Until then, the CLI and app have separate
+   vaults.
+2. **Phase 5 (rest)** — Codex CLI, Aider, OpenCode connectors.
+3. **Proxy streaming** — URLSession.bytes(for:) passthrough for SSE.
+4. **First-run threat-model flow** (three-screen explainer).
+5. **Sparkle + GitHub Releases CI + Homebrew cask** (Phase 8 release
+   pipeline).

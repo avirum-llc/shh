@@ -14,7 +14,7 @@ struct ShhApp: App {
                 onQuit: { NSApplication.shared.terminate(nil) }
             )
         } label: {
-            MenuBarLabel(keyCount: keys.count)
+            MenuBarLabel()
         }
         .menuBarExtraStyle(.window)
 

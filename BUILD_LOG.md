@@ -175,19 +175,48 @@ anyone who wants to build the app.
 
 ### What's verified
 
-- All source files written; exhaustive fields from project.yml provided.
-- Not built yet — requires `xcodegen generate` + `open Shh.xcodeproj`
-  which is a local interactive step.
+- `xcodegen generate` clean.
+- `xcodebuild` clean with ad-hoc signing overrides.
+- `Shh.app` builds and launches; the resident process shows up under
+  `pgrep Shh`.
+
+### Entitlements snag and fix
+
+First build attempt (automatic signing) failed with *"No Account for
+Team 422FSC44SS"* — Xcode's account store didn't have a current Apple
+ID session for that team. Switched to manual signing with identity `-`
+(ad-hoc); that then failed with *"Shh requires a provisioning profile"*
+because `keychain-access-groups` in the entitlements forces
+provisioning.
+
+Fix: **drop `keychain-access-groups` from the dev entitlements.**
+Unsandboxed macOS apps can read and write generic-password Keychain
+items in the user's login Keychain without any `keychain-access-groups`
+entitlement — the default access group is the bundle id, which is
+sufficient when the only consumer is the app itself. The entitlement is
+only needed to *share* Keychain items across bundles (menubar app +
+bundled CLI — Phase 1C) or to pass App Store review, neither of which
+applies to a dev build. Phase 8 release CI will re-add the team-prefixed
+access group.
+
+Added `scripts/build-app-dev.sh` — one command: `xcodegen generate` +
+`xcodebuild` with the right ad-hoc overrides. Future dev iteration is
+`./scripts/build-app-dev.sh` followed by `open <path>`.
 
 ### What's next
 
-Manish runs `brew install xcodegen && xcodegen generate`, opens
-`Shh.xcodeproj`, builds. On first launch: menubar lock + "0" appears,
-dropdown shows empty state, Add Key sheet opens. First add should
-trigger a Touch ID prompt and land a key in Keychain — the first real
-product moment.
+Click the menubar lock, Add key, fill Provider / Label / API key /
+Bucket, Save to vault. That path should trigger Touch ID (first-time
+write of a `.biometryCurrentSet` item) and drop a real entry in the
+login Keychain + `~/.config/shh/vault-metadata.json`. Dropdown refreshes
+with the new row — the first real product moment.
 
-If the build reveals SwiftUI or project.yml issues, iterate. Once the
-Add Key flow is happy, Phase 1C bundles the CLI binary inside the .app
-and symlinks it to `/usr/local/bin/shh` so the CLI inherits the app's
-signing identity. That closes the Keychain-from-CLI loop.
+If the Add Key flow surfaces issues (SwiftUI complaints, Keychain
+failures with unsandboxed ad-hoc signing, anything else), we iterate
+here. Once it's happy:
+
+- **Phase 1C:** bundle the `shh` CLI binary inside the .app, symlink to
+  `/usr/local/bin/shh`. CLI inherits the app's signing identity so the
+  CLI-from-terminal flow starts working.
+- **Phase 2:** scanner + migration flow (walk shell configs and `.env`
+  files, surface detected keys, offer to move them into the vault).

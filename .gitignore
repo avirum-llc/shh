@@ -12,9 +12,8 @@ DerivedData/
 # macOS
 .DS_Store
 
-# Claude session data — but keep grill-run artifacts
-.claude/*
-!.claude/grill-runs/
+# Claude session data
+.claude/
 .memsearch/
 
 # Local Claude memory (per-user notes, not shared)

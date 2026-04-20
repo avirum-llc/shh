@@ -13,8 +13,10 @@ Open source. Local-first. Biometric-gated.
 
 **Pre-alpha.** Being built in the open. Not installable yet.
 
-See [`BUILD_LOG.md`](BUILD_LOG.md) for the dated development journal and
-[`shh-plan.md`](shh-plan.md) for the full product plan.
+See [`BUILD_LOG.md`](BUILD_LOG.md) for the dated development journal,
+[`shh-plan.md`](shh-plan.md) for the original product plan, and
+[`docs/`](docs/) for the refined spec, research findings, and implementation
+plan that came out of the pre-build grill.
 
 ## The threat model in one paragraph
 

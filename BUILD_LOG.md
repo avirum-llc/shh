@@ -12,8 +12,8 @@ history.
 Kicking off the build. Spent the day grilling the PRD (`shh-plan.md`),
 running a five-subagent research pass (CLI compatibility, API-key regex
 catalog, competitive landscape, Mac stack patterns, token counting), and
-drafting an eight-phase implementation plan. All three /grill phase outputs
-are at `.claude/grill-runs/shh/` for reference.
+drafting an eight-phase implementation plan. The three refined artifacts
+live in [`docs/`](docs/): `spec.md`, `research.md`, `plan.md`.
 
 ### Locked decisions
 
@@ -30,7 +30,7 @@ are at `.claude/grill-runs/shh/` for reference.
   data (SQLite, cache).
 - **Proxy:** plain HTTP on `127.0.0.1:18888`. HTTPS on loopback is security
   theater on the local machine and adds a real CA-trust attack surface. See
-  `.claude/grill-runs/shh/spec.md` Q7 for the full argument.
+  [`docs/spec.md`](docs/spec.md) Q7 for the full argument.
 - **Audience:** API-key users only. Claude.ai subscription, Cursor hosted
   mode, and Codex OAuth plans are explicitly out of scope.
 
@@ -54,3 +54,10 @@ the key successfully.
 
 No Xcode project yet. SPM compiles on its own; the `.xcodeproj` for the
 menubar app lands in Phase 1.
+
+### Cleanup pass
+
+Moved the grill-phase artifacts (`spec.md`, `research.md`, `plan.md`) out
+of `.claude/grill-runs/shh/` and into `docs/`. They were project-first-class
+docs hiding inside a tool-specific hidden folder; now they live where a
+contributor would actually look. README and `.gitignore` updated.

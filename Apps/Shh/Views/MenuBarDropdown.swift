@@ -159,7 +159,7 @@ struct MenuBarDropdown: View {
         VStack(alignment: .leading, spacing: 0) {
             actionRow("Dashboard", shortcut: "⌘D", primary: false, action: onOpenDashboard)
             actionRow("Add key", shortcut: "⌘N", primary: true, action: onAddKey)
-            actionRow("Scan for leaks…", shortcut: "⌘S", primary: false, action: onOpenScanner)
+            actionRow("Scan for API keys…", shortcut: "⌘S", primary: false, action: onOpenScanner)
             actionRow("Connect a tool…", shortcut: "⌘T", primary: false, action: onOpenConnect)
             actionRow("Install CLI", shortcut: "", primary: false) {
                 installCLIMessage = onInstallCLI()

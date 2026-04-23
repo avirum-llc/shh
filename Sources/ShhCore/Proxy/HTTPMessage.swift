@@ -7,10 +7,38 @@ public struct HTTPRequest: Sendable {
     public let headers: [String: String]  // keys lowercased
     public let body: Data
 
-    /// Return the bearer token from the Authorization header, if present.
+    /// Return the shh dummy token from wherever the client put it.
+    /// Providers auth differently:
+    ///   - Anthropic: `x-api-key: <key>`
+    ///   - Google Gemini: `?key=<key>` query or `x-goog-api-key: <key>`
+    ///   - Everyone else: `Authorization: Bearer <key>`
+    /// The proxy accepts any of these as long as the value starts with
+    /// `shh.` (our dummy prefix). Real upstream keys never start with
+    /// `shh.` so this is unambiguous.
     public var authToken: String? {
-        guard let value = headers["authorization"] else { return nil }
-        if value.hasPrefix("Bearer ") { return String(value.dropFirst("Bearer ".count)) }
+        if let value = headers["authorization"], value.hasPrefix("Bearer ") {
+            let token = String(value.dropFirst("Bearer ".count))
+            if token.hasPrefix("shh.") { return token }
+        }
+        if let value = headers["x-api-key"], value.hasPrefix("shh.") {
+            return value
+        }
+        if let value = headers["x-goog-api-key"], value.hasPrefix("shh.") {
+            return value
+        }
+        // Query-string `?key=shh.xxx` — Gemini REST default.
+        if let queryStart = path.firstIndex(of: "?") {
+            let query = path[path.index(after: queryStart)...]
+            for pair in query.split(separator: "&") {
+                let kv = pair.split(separator: "=", maxSplits: 1)
+                guard kv.count == 2, kv[0] == "key" else { continue }
+                // Fail-closed: if percent-decoding fails, skip rather than
+                // falling back to the raw encoded value (which would silently
+                // fail the shh. prefix check and confuse the reader).
+                guard let value = String(kv[1]).removingPercentEncoding else { continue }
+                if value.hasPrefix("shh.") { return value }
+            }
+        }
         return nil
     }
 }

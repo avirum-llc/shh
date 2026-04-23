@@ -44,6 +44,26 @@ public actor ProxyServer {
         return URLSession(configuration: config)
     }()
 
+    // In-memory cache of decrypted secrets. Reading the vault on every
+    // request triggers a Keychain auth prompt per read — unacceptable UX
+    // under both dev-build (each prompt is a macOS confirm dialog) and
+    // release-build (each prompt is Touch ID). Cache for a short TTL so
+    // the prompt fires at most once per key per TTL window. Matches the
+    // biometric reuse duration in `KeychainStore` (5 minutes).
+    private struct CachedKey {
+        let secret: String
+        let expiresAt: Date
+    }
+    private var keyCache: [String: CachedKey] = [:]
+    private let keyCacheTTL: TimeInterval = 300
+
+    /// Request headers we never forward to upstream: we supply our own
+    /// auth, host, and framing.
+    private static let skipHeaders: Set<String> = [
+        "host", "authorization", "x-api-key", "x-goog-api-key",
+        "content-length", "connection", "accept-encoding",
+    ]
+
     public init(
         vault: Vault,
         log: RequestLog = RequestLog(),
@@ -56,16 +76,37 @@ public actor ProxyServer {
         self.port = port
     }
 
+    /// Invalidate the in-memory secret cache — call after the vault
+    /// changes (key added/removed/rotated) so stale keys don't linger.
+    public func clearKeyCache() {
+        keyCache.removeAll()
+    }
+
+    private func cachedKey(
+        id: String,
+        reason: String
+    ) async throws -> String {
+        if let entry = keyCache[id], entry.expiresAt > Date() {
+            return entry.secret
+        }
+        let secret = try await vault.read(id: id, reason: reason)
+        keyCache[id] = CachedKey(
+            secret: secret,
+            expiresAt: Date().addingTimeInterval(keyCacheTTL)
+        )
+        return secret
+    }
+
     public func start() throws {
         guard !isRunning else { return }
         let params = NWParameters.tcp
         params.acceptLocalOnly = true
         params.allowLocalEndpointReuse = true
 
-        let listener = try NWListener(
-            using: params,
-            on: NWEndpoint.Port(rawValue: port)!
-        )
+        guard let endpoint = NWEndpoint.Port(rawValue: port) else {
+            throw ProxyError.badRequest("invalid port: \(port)")
+        }
+        let listener = try NWListener(using: params, on: endpoint)
         listener.newConnectionHandler = { [weak self] connection in
             guard let self else { connection.cancel(); return }
             Task { await self.accept(connection) }
@@ -181,24 +222,23 @@ public actor ProxyServer {
         guard let token = request.authToken else { throw ProxyError.missingAuth }
         let dummy = try DummyToken.parse(token)
 
-        let keyID = VaultKey.makeID(provider: dummy.provider, label: dummy.keyLabel)
-        let realKey = try await vault.read(
-            id: keyID,
-            reason: "Claude Code / \(dummy.project) wants to use your \(dummy.provider.rawValue) key"
-        )
-
+        // Validate provider before touching the vault — unknown providers
+        // should surface "no upstream configured" rather than "Keychain
+        // item not found" (the ID wouldn't exist either way).
         guard let upstreamURL = UpstreamRouter.upstream(for: dummy.provider, path: request.path) else {
             throw ProxyError.unsupportedProvider(dummy.provider.rawValue)
         }
 
+        let keyID = VaultKey.makeID(provider: dummy.provider, label: dummy.keyLabel)
+        let realKey = try await cachedKey(
+            id: keyID,
+            reason: "Claude Code / \(dummy.project) wants to use your \(dummy.provider.rawValue) key"
+        )
+
         var upstreamRequest = URLRequest(url: upstreamURL)
         upstreamRequest.httpMethod = request.method
         upstreamRequest.httpBody = request.body.isEmpty ? nil : request.body
-        let skipHeaders: Set<String> = [
-            "host", "authorization", "x-api-key",
-            "content-length", "connection", "accept-encoding",
-        ]
-        for (name, value) in request.headers where !skipHeaders.contains(name) {
+        for (name, value) in request.headers where !Self.skipHeaders.contains(name) {
             upstreamRequest.setValue(value, forHTTPHeaderField: name)
         }
         UpstreamRouter.applyCredentials(to: &upstreamRequest, provider: dummy.provider, realKey: realKey)
@@ -254,7 +294,11 @@ public actor ProxyServer {
         let outputBytes = totalOut
         let inputTokens = TokenCounter.estimate(bytes: inputBytes)
         let outputTokens = TokenCounter.estimate(bytes: outputBytes)
-        let model = TokenCounter.parseModel(from: request.body)
+        let model = TokenCounter.parseModel(
+            provider: dummy.provider,
+            path: request.path,
+            body: request.body
+        )
         let costUSD = model.map {
             priceTable.cost(
                 provider: dummy.provider,

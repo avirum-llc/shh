@@ -24,4 +24,32 @@ public enum TokenCounter {
         }
         return dict["model"] as? String
     }
+
+    /// Extract the model name using provider-specific conventions.
+    /// Anthropic and OpenAI put `model` in the JSON body. Gemini's REST
+    /// API encodes it in the URL path (`/v1beta/models/<model>:...`).
+    /// Returns nil if no convention matched.
+    public static func parseModel(
+        provider: VaultKey.Provider,
+        path: String,
+        body: Data
+    ) -> String? {
+        if provider == .gemini, let extracted = extractGeminiModel(fromPath: path) {
+            return extracted
+        }
+        return parseModel(from: body)
+    }
+
+    /// Pulls `<model>` out of paths like
+    /// `/v1beta/models/gemini-2.5-flash:generateContent`. Tolerates a
+    /// trailing query string and alternative action separators.
+    static func extractGeminiModel(fromPath path: String) -> String? {
+        let noQuery = path.split(separator: "?", maxSplits: 1).first.map(String.init) ?? path
+        guard let range = noQuery.range(of: "/models/") else { return nil }
+        let afterMarker = noQuery[range.upperBound...]
+        // Model name runs until `:` (action like `:generateContent`) or `/`.
+        let stopIdx = afterMarker.firstIndex(where: { $0 == ":" || $0 == "/" }) ?? afterMarker.endIndex
+        let model = String(afterMarker[..<stopIdx])
+        return model.isEmpty ? nil : model
+    }
 }

@@ -65,7 +65,7 @@ struct ShhApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.center)
 
-        Window("Scan for keys", id: WindowID.scanner) {
+        Window("Scan for API keys", id: WindowID.scanner) {
             ScannerWindow()
                 .onAppear { NSApp.activate(ignoringOtherApps: true) }
         }

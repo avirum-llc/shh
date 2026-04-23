@@ -39,6 +39,40 @@ public struct FileScanner: Sendable {
             + documentsRoots
     }
 
+    /// Directories skipped in `.fullHome` scope. Large, machine-generated
+    /// trees that don't contain user-authored secrets.
+    public static let fullHomeSkipDirs: Set<String> = [
+        "node_modules", ".git", ".hg", ".svn",
+        ".Trash", "Trash",
+        "DerivedData", ".build", "build", "dist", ".next", ".nuxt",
+        "Pods", "vendor", "target", ".cargo", ".rustup",
+        ".gradle", ".m2", ".nuget",
+        ".venv", "venv",
+        ".npm", ".yarn", ".pnpm-store", ".bun",
+        "Caches", "Containers", "Logs", "CloudStorage",
+        "Mobile Documents", "Messages", "Developer",
+        "Photos Library.photoslibrary", "Music Library.musiclibrary",
+        "Photo Booth Library",
+    ]
+
+    public struct Progress: Sendable {
+        public let currentPath: String
+        public let filesScanned: Int
+        public let hits: Int
+    }
+
+    /// Common text-file filter used by both the curated and deep-home scans.
+    /// Mirrors the files developers typically paste secrets into.
+    static func isInterestingFile(name: String, suffix: String) -> Bool {
+        if name.hasPrefix(".env") { return true }
+        switch suffix {
+        case "yml", "yaml", "json", "toml", "txt", "md": return true
+        default: break
+        }
+        if name == "config" || name == "settings.json" { return true }
+        return name.hasSuffix("rc") || name.hasSuffix("profile")
+    }
+
     /// Scan all roots and return detections. Low-confidence matches for
     /// undocumented formats are included — the caller decides whether to
     /// show them.
@@ -57,33 +91,130 @@ public struct FileScanner: Sendable {
         return results
     }
 
+    /// Cancellable deep scan of the entire home directory. Skips large
+    /// machine-generated trees (see `fullHomeSkipDirs`). Fires `progress`
+    /// every ~200 files scanned. Throws `CancellationError` if cancelled.
+    public static func scanFullHome(
+        patterns: [KeyPattern] = KeyPattern.catalog,
+        fileManager: FileManager = .default,
+        progress: (@Sendable (Progress) -> Void)? = nil
+    ) async throws -> [Detection] {
+        let home = fileManager.homeDirectoryForCurrentUser
+        let scanner = FileScanner(
+            patterns: patterns,
+            roots: [home],
+            fileManager: fileManager
+        )
+        var results: [Detection] = []
+        var filesScanned = 0
+        try scanner.scanHomeDeep(
+            home,
+            into: &results,
+            filesScanned: &filesScanned,
+            progress: progress
+        )
+        return results
+    }
+
     // MARK: - Private
 
+    /// Deep recursive walk used by `scanFullHome`. Skips any directory
+    /// whose last path component is in `fullHomeSkipDirs`. Periodically
+    /// honours `Task.checkCancellation()` and fires the progress callback.
+    private func scanHomeDeep(
+        _ root: URL,
+        into out: inout [Detection],
+        filesScanned: inout Int,
+        progress: (@Sendable (Progress) -> Void)?
+    ) throws {
+        // NOTE: We intentionally do NOT pass `.skipsHiddenFiles`. `.env`,
+        // `.envrc`, `.zshrc`, `.aider.conf.yml` — the literal files this
+        // product scans — are all hidden by Unix convention. Hidden
+        // directories (`.git`, `.Trash`, etc.) are excluded by the
+        // `fullHomeSkipDirs` check inside the loop.
+        guard let enumerator = fileManager.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .isDirectoryKey, .isSymbolicLinkKey],
+            options: [.skipsPackageDescendants],
+            errorHandler: { _, _ in true }
+        ) else { return }
+
+        for case let url as URL in enumerator {
+            // Cancel check every iteration — NSEnumerator is cheap to skip.
+            if filesScanned % 50 == 0 {
+                try Task.checkCancellation()
+            }
+
+            // Skip known-junk directories entirely.
+            let name = url.lastPathComponent
+            if FileScanner.fullHomeSkipDirs.contains(name) {
+                enumerator.skipDescendants()
+                continue
+            }
+
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey]) else {
+                continue
+            }
+            // Security: skip symlinks so a link pointing outside the scan root
+            // (e.g., ~/link -> /etc) can't exfiltrate or scan system directories.
+            if values.isSymbolicLink == true { continue }
+            guard values.isRegularFile == true else { continue }
+            if let size = values.fileSize, size > 2_000_000 { continue }
+
+            guard FileScanner.isInterestingFile(
+                name: url.lastPathComponent,
+                suffix: url.pathExtension.lowercased()
+            ) else { continue }
+
+            scanFile(url, into: &out)
+            filesScanned += 1
+
+            if filesScanned % 200 == 0 {
+                progress?(Progress(
+                    currentPath: url.path,
+                    filesScanned: filesScanned,
+                    hits: out.count
+                ))
+            }
+        }
+
+        // Final progress tick so the UI sees the completed count.
+        progress?(Progress(
+            currentPath: "",
+            filesScanned: filesScanned,
+            hits: out.count
+        ))
+    }
+
     private func scanDirectory(_ dir: URL, into out: inout [Detection]) {
+        // Do NOT pass `.skipsHiddenFiles`: hidden files like `.env` are the
+        // primary scan target. Junk hidden dirs (`.git`, `.Trash`, etc.)
+        // are skipped via `fullHomeSkipDirs` below.
         guard let enumerator = fileManager.enumerator(
             at: dir,
-            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
-            options: [.skipsHiddenFiles],
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey],
+            options: [.skipsPackageDescendants],
             errorHandler: nil
         ) else { return }
 
         for case let url as URL in enumerator {
-            // Skip huge files and non-regular files.
-            if let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]) {
-                guard values.isRegularFile == true else { continue }
-                if let size = values.fileSize, size > 2_000_000 { continue }
-            }
-            // Only scan likely-textual files.
             let name = url.lastPathComponent
-            let suffix = url.pathExtension.lowercased()
-            let interesting = name.hasPrefix(".env")
-                || name == ".env"
-                || suffix == "yml" || suffix == "yaml"
-                || suffix == "json" || suffix == "toml"
-                || suffix == "txt" || suffix == "md"
-                || name == "config" || name == "settings.json"
-                || name.hasSuffix("rc") || name.hasSuffix("profile")
-            guard interesting else { continue }
+            // Junk directory pruning (keeps scan bounded even without
+            // `.skipsHiddenFiles`). Covers .git, .Trash, node_modules, etc.
+            if FileScanner.fullHomeSkipDirs.contains(name) {
+                enumerator.skipDescendants()
+                continue
+            }
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .isSymbolicLinkKey]) else {
+                continue
+            }
+            if values.isSymbolicLink == true { continue }
+            guard values.isRegularFile == true else { continue }
+            if let size = values.fileSize, size > 2_000_000 { continue }
+            guard FileScanner.isInterestingFile(
+                name: name,
+                suffix: url.pathExtension.lowercased()
+            ) else { continue }
             scanFile(url, into: &out)
         }
     }

@@ -31,7 +31,7 @@ public struct KeyPattern: Sendable, Hashable {
         // Tier 1 — LLM providers
         KeyPattern(
             provider: .anthropic,
-            regex: #"sk-ant-(?:api|admin)\d{2}-[A-Za-z0-9_\-]{80,120}"#,
+            regex: #"sk-ant-(?:api|admin)\d{2}-[A-Za-z0-9_\-]{80,180}"#,
             envHints: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_"],
             tier: 1
         ),

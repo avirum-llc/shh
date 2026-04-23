@@ -1,6 +1,118 @@
 import XCTest
 @testable import ShhCore
 
+final class TokenCounterParseModelTests: XCTestCase {
+    func testGeminiModelFromRestPath() {
+        let m = TokenCounter.extractGeminiModel(fromPath: "/v1beta/models/gemini-2.5-flash:generateContent")
+        XCTAssertEqual(m, "gemini-2.5-flash")
+    }
+
+    func testGeminiModelWithQueryString() {
+        let m = TokenCounter.extractGeminiModel(fromPath: "/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse")
+        XCTAssertEqual(m, "gemini-2.5-pro")
+    }
+
+    func testGeminiModelDispatchUsesPath() {
+        let body = Data("{\"contents\":[]}".utf8)
+        let m = TokenCounter.parseModel(provider: .gemini, path: "/v1beta/models/gemini-2.5-flash:generateContent", body: body)
+        XCTAssertEqual(m, "gemini-2.5-flash")
+    }
+
+    func testAnthropicDispatchUsesBody() {
+        let body = Data("{\"model\":\"claude-haiku-4-5\",\"messages\":[]}".utf8)
+        let m = TokenCounter.parseModel(provider: .anthropic, path: "/v1/messages", body: body)
+        XCTAssertEqual(m, "claude-haiku-4-5")
+    }
+
+    func testGeminiCostResolvesAfterExtraction() {
+        let rates = PriceTable.bundled
+        let cost = rates.cost(provider: .gemini, model: "gemini-2.5-flash", inputTokens: 1_000_000, outputTokens: 1_000_000)
+        XCTAssertEqual(cost, 0.3 + 2.5, accuracy: 0.001)
+    }
+}
+
+final class MigratorExtractKeyTests: XCTestCase {
+    func testExtractsAnthropicFromJSONBlob() {
+        let suffix = String(repeating: "x", count: 95)
+        let blob = #"{"claudeAiOauth":{"accessToken":"sk-ant-api03-\#(suffix)","refreshToken":"rt","expiresAt":1734000000}}"#
+        let out = Migrator.extractKey(from: blob, provider: .anthropic, patterns: KeyPattern.catalog)
+        XCTAssertNotNil(out)
+        XCTAssertTrue(out!.hasPrefix("sk-ant-api03-"))
+        XCTAssertFalse(out!.contains("{"), "Extracted key should not contain JSON braces")
+    }
+
+    func testExtractsGeminiFromSettingsBlob() {
+        let suffix = String(repeating: "a", count: 35)
+        let blob = #"{"env":{"GEMINI_API_KEY":"AIza\#(suffix)"}}"#
+        let out = Migrator.extractKey(from: blob, provider: .gemini, patterns: KeyPattern.catalog)
+        XCTAssertNotNil(out)
+        XCTAssertTrue(out!.hasPrefix("AIza"))
+    }
+
+    func testNilWhenBlobHasNoKeyPattern() {
+        let blob = #"{"version":"1.0","config":"nothing-secret-like-in-here"}"#
+        let out = Migrator.extractKey(from: blob, provider: .anthropic, patterns: KeyPattern.catalog)
+        XCTAssertNil(out)
+    }
+
+    func testBase64PaddingAloneReturnsNil() {
+        let blob = "PQ=="
+        let out = Migrator.extractKey(from: blob, provider: .anthropic, patterns: KeyPattern.catalog)
+        XCTAssertNil(out)
+    }
+}
+
+final class KeychainScannerClassifyTests: XCTestCase {
+    func testClassifyAnthropicByService() {
+        let c = KeychainScanner.classify(service: "Anthropic API", account: "token", label: nil)
+        XCTAssertNotNil(c)
+        XCTAssertEqual(c?.provider, .anthropic)
+        XCTAssertEqual(c?.confidence, .high)
+    }
+
+    func testClassifyAnthropicByEnvVarAccount() {
+        let c = KeychainScanner.classify(service: "roast-eval", account: "ANTHROPIC_API_KEY", label: nil)
+        XCTAssertNotNil(c)
+        XCTAssertEqual(c?.provider, .anthropic)
+        XCTAssertEqual(c?.confidence, .high)
+    }
+
+    func testClassifyOpenAIEnvVarOnlyGivesMediumHint() {
+        // Account shaped like an env var for a provider whose name itself
+        // is *not* present → lands in the mediumHint bucket.
+        let c = KeychainScanner.classify(service: "deploy-bot", account: "HF_TOKEN", label: nil)
+        XCTAssertEqual(c?.provider, .huggingface)
+        XCTAssertEqual(c?.confidence, .mediumHint)
+    }
+
+    func testClassifyGeminiAiStudio() {
+        let c = KeychainScanner.classify(service: "aistudio.google.com", account: "user", label: nil)
+        XCTAssertEqual(c?.provider, .gemini)
+        XCTAssertEqual(c?.confidence, .high)
+    }
+
+    func testClassifyGenericApiKey() {
+        let c = KeychainScanner.classify(service: "some-service", account: "api_key", label: nil)
+        XCTAssertEqual(c?.provider.rawValue, "generic")
+        XCTAssertEqual(c?.confidence, .low)
+    }
+
+    func testClassifyReturnsNilForWifi() {
+        let c = KeychainScanner.classify(service: "airport", account: "HomeWifi", label: nil)
+        XCTAssertNil(c)
+    }
+
+    func testClassifyReturnsNilForPlainText() {
+        let c = KeychainScanner.classify(service: "Notes", account: "manish", label: nil)
+        XCTAssertNil(c)
+    }
+
+    func testClassifyLabelContributes() {
+        let c = KeychainScanner.classify(service: "opaque", account: "key", label: "OpenAI Production")
+        XCTAssertEqual(c?.provider, .openai)
+    }
+}
+
 final class KeyPatternCatalogTests: XCTestCase {
     func testCatalogCompilesAllRegexes() {
         for pattern in KeyPattern.catalog {

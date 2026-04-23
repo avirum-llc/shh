@@ -5,7 +5,7 @@ import ShhCore
 struct Scan: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "scan",
-        abstract: "Scan shell configs and project folders for leaked API keys."
+        abstract: "Scan shell configs and project folders for API keys you can import into the vault."
     )
 
     @Flag(help: "Migrate all high-confidence detections into the vault, rewriting the source files.")

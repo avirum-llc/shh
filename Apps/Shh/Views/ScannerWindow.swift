@@ -9,6 +9,7 @@ struct ScannerWindow: View {
     @State private var bucket: VaultKey.Bucket = .personal
     @State private var errorMessage: String?
     @State private var migrationStatus: String?
+    @State private var showingDeepScan = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -37,15 +38,18 @@ struct ScannerWindow: View {
         .frame(width: 660, height: 540)
         .background(Tokens.surfaceBase)
         .task { await scan() }
+        .sheet(isPresented: $showingDeepScan) {
+            DeepScanSheet()
+        }
     }
 
     // MARK: - Sections
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Scan for leaked keys")
+            Text("Scan for API keys")
                 .font(Tokens.fontSectionTitle)
-            Text("shh walks your shell configs, CLI config files, and common project directories for anything that looks like an API key.")
+            Text("shh walks your shell configs, CLI config files, and common project directories for anything that looks like an API key you can import into the vault.")
                 .font(.system(size: 12))
                 .foregroundStyle(Tokens.inkMuted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -93,6 +97,12 @@ struct ScannerWindow: View {
                 }
                 .disabled(scanning || migrating)
 
+                Button("Deep scan…") {
+                    showingDeepScan = true
+                }
+                .disabled(scanning || migrating)
+                .help("Walk the entire home directory and login Keychain for API keys.")
+
                 Spacer()
 
                 Picker("Bucket", selection: $bucket) {
@@ -127,8 +137,12 @@ struct ScannerWindow: View {
         errorMessage = nil
         migrationStatus = nil
         selected = []
-        let scanner = FileScanner()
-        let results = scanner.scan()
+        // Walk the filesystem off the main actor — otherwise the UI
+        // freezes while the scanner reads every shell-rc, config file, and
+        // .env in ~/Documents, ~/code, ~/Projects.
+        let results = await Task.detached(priority: .userInitiated) {
+            FileScanner().scan()
+        }.value
         // Filter to high + mediumHint by default — low-confidence matches
         // are noise in the UI
         detections = results.filter { $0.confidence == .high || $0.confidence == .mediumHint }

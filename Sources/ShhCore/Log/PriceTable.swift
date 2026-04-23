@@ -38,6 +38,8 @@ public struct PriceTable: Sendable {
         "openai:gpt-5":                 .init(inputPerMillion: 1.25,                                 cacheReadPerMillion: 0.125,  outputPerMillion: 10),
         "openai:gpt-5.5":               .init(inputPerMillion: 2,                                    cacheReadPerMillion: 0.2,    outputPerMillion: 16),
         "gemini:gemini-2.5-pro":        .init(inputPerMillion: 1.25,                                 cacheReadPerMillion: 0.3125, outputPerMillion: 10),
+        "gemini:gemini-2.5-flash":      .init(inputPerMillion: 0.3,                                  cacheReadPerMillion: 0.075,  outputPerMillion: 2.5),
+        "gemini:gemini-2.5-flash-lite": .init(inputPerMillion: 0.1,                                  cacheReadPerMillion: 0.025,  outputPerMillion: 0.4),
         "gemini:gemini-3-pro":          .init(inputPerMillion: 2,    cacheCreationPerMillion: 0.5,                                outputPerMillion: 12),
     ])
 

@@ -374,7 +374,7 @@ curl /__shh_ping__ → {"shh":"alive"}
 ### Minimum to actually release
 
 1. Test the Anthropic round-trip end-to-end with a real key.
-2. Set up `avirumapps/homebrew-shh` tap repo.
+2. Set up `avirum-llc/homebrew-shh` tap repo.
 3. Generate Sparkle EdDSA keys, publish initial appcast.xml, add
    `SUFeedURL` to Info.plist.
 4. Add the six CI secrets.

@@ -26,12 +26,12 @@ plan.
 Not yet published. When it is, one of:
 
 ```sh
-# Homebrew cask (after the avirumapps/homebrew-shh tap is set up)
-brew tap avirumapps/shh
+# Homebrew cask (after the avirum-llc/homebrew-shh tap is set up)
+brew tap avirum-llc/shh
 brew install --cask shh
 
 # Direct DMG from GitHub Releases
-open https://github.com/avirumapps/shh/releases/latest
+open https://github.com/avirum-llc/shh/releases/latest
 ```
 
 Until then, build from source — see Development below.
@@ -128,7 +128,7 @@ shh CLI          Shh.app (menubar)
 - `SPARKLE_ED_PRIVATE_KEY` — EdDSA private key for appcast signing
 
 Homebrew cask template lives at `.github/workflows/homebrew-cask.rb.template`;
-commit it into `avirumapps/homebrew-shh` to publish via `brew install --cask`.
+commit it into `avirum-llc/homebrew-shh` to publish via `brew install --cask`.
 
 ## License
 

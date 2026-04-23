@@ -3,8 +3,8 @@
 ## Reporting a vulnerability
 
 Please report security issues privately via
-[GitHub Security Advisories](https://github.com/avirumapps/shh/security/advisories/new)
-on the `avirumapps/shh` repository, or by email to `security@avirumapps.com`.
+[GitHub Security Advisories](https://github.com/avirum-llc/shh/security/advisories/new)
+on the `avirum-llc/shh` repository, or by email to `security@avirumapps.com`.
 
 Do not file a public GitHub issue for security-sensitive bugs.
 

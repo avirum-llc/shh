@@ -131,7 +131,7 @@ Phase 2 output. 5 parallel subagents: CLI compatibility, API-key regex catalog, 
 | Gemini 2.5 Pro (≤200K) | $1.25 | — | $0.3125 | $10 |
 | Gemini 3 Pro (≤200K) | $2 | $0.50 | — | $12 |
 
-Bundle as `prices.json`; fetch updates from signed manifest at `github.com/avirumapps/shh-prices` (per PRD FR-C2).
+Bundle as `prices.json`; fetch updates from signed manifest at `github.com/avirum-llc/shh-prices` (per PRD FR-C2).
 
 ---
 

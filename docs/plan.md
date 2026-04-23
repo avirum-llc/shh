@@ -36,7 +36,7 @@ Source: `spec.md` + `research.md`. Target: Mac-native menubar app (SwiftUI + Swi
 ### Phase 0 — Bootstrap
 **Files:**
 - `Shh.xcodeproj` with three targets: `Shh` (menubar app), `ShhProxy` (XPC service), `shh-cli` (Swift package using swift-argument-parser)
-- `github.com/avirumapps/shh` repo — MIT license (default per PRD; confirm with Manish), `.gitignore`, `README.md` placeholder, `SECURITY.md`, `LICENSE`
+- `github.com/avirum-llc/shh` repo — MIT license (default per PRD; confirm with Manish), `.gitignore`, `README.md` placeholder, `SECURITY.md`, `LICENSE`
 - `.github/workflows/release.yml` skeleton (don't wire signing yet)
 - Bundle ID: `com.avirumapps.shh`
 - XPC service bundle ID: `com.avirumapps.shh-proxy`
@@ -125,7 +125,7 @@ Source: `spec.md` + `research.md`. Target: Mac-native menubar app (SwiftUI + Swi
 - `Shh/Store/DatabaseManager.swift` — GRDB setup at `~/Library/Application Support/shh/log.sqlite`; migrations versioned from v1
 - `Shh/Store/Schema+v1.swift` — `requests` table: `id, ts, provider, model, input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, cost_usd, duration_ms, status, project_tag, key_id, request_id`
 - `Shh/Pricing/prices.v1.json` — bundled, from research §5
-- `Shh/Pricing/PriceTable.swift` — load bundled + fetch-and-verify signed manifest from `github.com/avirumapps/shh-prices`
+- `Shh/Pricing/PriceTable.swift` — load bundled + fetch-and-verify signed manifest from `github.com/avirum-llc/shh-prices`
 - `Shh/Pricing/TokenCounter.swift` — provider dispatch:
   - OpenAI: [TiktokenSwift](https://github.com/narner/TiktokenSwift) via SPM
   - Anthropic: `len(text)/3` heuristic for UI preview; post-hoc truth from response `usage`
@@ -218,7 +218,7 @@ Source: `spec.md` + `research.md`. Target: Mac-native menubar app (SwiftUI + Swi
   5. `xcrun stapler staple <dmg>`
   6. Create GitHub Release with DMG asset
   7. `generate_appcast` → commit updated `appcast.xml` to repo root
-  8. Trigger downstream PR to `avirumapps/homebrew-shh` updating cask version + SHA256
+  8. Trigger downstream PR to `avirum-llc/homebrew-shh` updating cask version + SHA256
 - `README.md` — demo GIF (record with Cleanshot), comparison table (from PRD §13), threat-model section, install instructions (Homebrew one-liner + DMG + build-from-source), contributor guide, THREAT_MODEL.md link
 - `THREAT_MODEL.md` — standalone version of §8 from PRD
 - `BUILD_LOG.md` — starts today; Claude appends dated entries each session
@@ -226,7 +226,7 @@ Source: `spec.md` + `research.md`. Target: Mac-native menubar app (SwiftUI + Swi
 
 **Verification:**
 1. Tag `v0.1.0-test` → CI green → DMG downloadable from GitHub Releases.
-2. Fresh Mac (or Migration Assistant-cleared account) → `brew tap avirumapps/shh && brew install --cask shh` → app installs, Gatekeeper OK, app opens, first-run flow fires.
+2. Fresh Mac (or Migration Assistant-cleared account) → `brew tap avirum-llc/shh && brew install --cask shh` → app installs, Gatekeeper OK, app opens, first-run flow fires.
 3. Tag `v0.1.1-test` → Sparkle in v0.1.0 sees update within 24h → installs silently.
 4. README demo GIF plays inline on github.com.
 
@@ -258,7 +258,7 @@ Source: `spec.md` + `research.md`. Target: Mac-native menubar app (SwiftUI + Swi
 | Dummy token format `shh-<provider>-<project>-<key>` | Phase 3 | Proposed |
 | GRDB schema v1 | Phase 4 | Via migrations |
 | License | Phase 0 | **MIT per PRD — confirm with Manish** |
-| Homebrew tap `avirumapps/homebrew-shh` | Phase 8 | Per PRD |
+| Homebrew tap `avirum-llc/homebrew-shh` | Phase 8 | Per PRD |
 | Apple Developer team ID | Phase 0 | **Presumed same as Roast — confirm with Manish** |
 
 ## Estimated shape

@@ -132,7 +132,7 @@ Every request through the proxy is logged locally (SQLite) with provider, model,
 ### 6.3 Cost tracker
 
 - **FR-C1.** Log every forwarded request to a local SQLite database with: timestamp, provider, model, input_tokens, output_tokens, cost_usd, project_tag, key_id.
-- **FR-C2.** Token costs are computed from a bundled, versioned price table. Update the price table from a signed manifest at `github.com/avirumapps/shh-prices` on launch, with a fallback to the bundled version.
+- **FR-C2.** Token costs are computed from a bundled, versioned price table. Update the price table from a signed manifest at `github.com/avirum-llc/shh-prices` on launch, with a fallback to the bundled version.
 - **FR-C3.** Menubar shows today's spend as the default widget.
 - **FR-C4.** Click-through shows a panel with today, this week, this month, and all-time spend; breakdown by provider, model, project, and key.
 - **FR-C5.** The panel supports filtering by date range and by project.
@@ -348,7 +348,7 @@ The right pattern is **what cmux and Ghostty actually do**:
 
 - Source code on GitHub (open source license)
 - Built artifacts (signed, notarized DMG) attached to GitHub Releases
-- Homebrew cask in your own tap (`brew tap avirumapps/shh && brew install --cask shh`)
+- Homebrew cask in your own tap (`brew tap avirum-llc/shh && brew install --cask shh`)
 - Auto-updates via Sparkle, with the update feed pointing back to GitHub Releases
 - Documentation site at `shh.avirumapps.com` that's mostly a pretty wrapper around the README
 
@@ -404,7 +404,7 @@ One database file at `~/Library/Application Support/shh/log.sqlite`. Backups are
 
 ### Cost calculation — bundled JSON + signed manifest from GitHub
 
-Bundle a known-good price table with each release. On launch, fetch a signed manifest from `raw.githubusercontent.com/avirumapps/shh-prices/main/prices.json`. If the fetch succeeds and the signature verifies, use the live one; otherwise fall back to bundled. Same pattern Sparkle uses for updates.
+Bundle a known-good price table with each release. On launch, fetch a signed manifest from `raw.githubusercontent.com/avirum-llc/shh-prices/main/prices.json`. If the fetch succeeds and the signature verifies, use the live one; otherwise fall back to bundled. Same pattern Sparkle uses for updates.
 
 ### Auto-updates — Sparkle 2.x
 
@@ -417,7 +417,7 @@ The de facto standard for non-App-Store Mac apps. Supports EdDSA-signed updates,
 - **Apple Developer ID Application certificate** ($99/year) stored as a GitHub Action secret
 - **DMG packaging** via `create-dmg`
 - **GitHub Releases** as the distribution channel — every tag triggers a build, signs, notarizes, packages, and uploads
-- **Homebrew tap** in a separate repo (`avirumapps/homebrew-shh`) with a cask formula that points at the GitHub Releases URL
+- **Homebrew tap** in a separate repo (`avirum-llc/homebrew-shh`) with a cask formula that points at the GitHub Releases URL
 
 ### What to explicitly *not* use
 

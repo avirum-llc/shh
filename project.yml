@@ -26,6 +26,12 @@ targets:
         NSHumanReadableCopyright: "Copyright © 2026 Manish Singh. MIT License."
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # Sparkle auto-update — public half of the EdDSA keypair used by
+        # CI to sign release appcast entries. The private seed lives in
+        # GitHub Actions secrets (SPARKLE_ED_PRIVATE_KEY) and never
+        # touches a developer machine or this repo.
+        SUPublicEDKey: "PFvacwcyyeQLcTxuOQBSl9qVSwVT4j9C+7TmeadXXyM="
+        SUFeedURL: "https://github.com/avirum-llc/shh/releases/latest/download/appcast.xml"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.avirumapps.shh
